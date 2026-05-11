@@ -1,9 +1,8 @@
-import sys, pythoncom, time, os, psutil, tabulate
+import sys, pythoncom, time, os, psutil
 import pandas as pd
 import glob
 from datetime import datetime
 import win32com.client.gencache
-
 
 sys.path.append(r"O:\Gerencia Contraloria\Analitica Contraloria\Automatiaciones Ambiente Pruebas\Carpeta Miguel Cardona\Bot Actualizacion Maestras\config")
 sys.path.append(r"O:\Gerencia Contraloria\Analitica Contraloria\Automatiaciones Ambiente Pruebas\Carpeta Miguel Cardona\Bot Actualizacion Maestras\src")
@@ -23,29 +22,6 @@ def cerrar_instancias_excel():
                 proceso.kill()
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
-
-# def inicio_y_filtrado_de_excel():
-#     excel = None
-#     try:
-#         pythoncom.CoInitialize()
-#         excel = win32com.client.Dispatch("Excel.Application")
-#         excel.Visible = True
-#         excel.ScreenUpdating = True
-#         excel.DisplayAlerts = False
-#         for archivo in os.listdir(RUTA_ENTRADA):            
-#             maestra = os.path.join(RUTA_ENTRADA, archivo)
-
-#             if not os.path.isfile(maestra):
-#                 continue
-#             nombre, extencion = os.path.splitext(archivo)
-#             if archivo.startswith('~$') or extencion != '.xlsx':
-#                 continue
-#     except Exception as e:
-#         print(f'❌ ERROR ----- {e}')
-#     finally:
-#         if excel is not None:
-#             excel.Quit()
-#         pythoncom.CoUninitialize()
 
 def actualizar_maestras_bd():
     """Actualiza (RefreshAll) todas las maestras en RUTA_ENTRADA y las guarda."""
@@ -92,47 +68,6 @@ def actualizar_maestras_bd():
         if excel is not None:
             excel.Quit()
         pythoncom.CoUninitialize()
-
-# def actualizar_maestras_excels(dfs):
-#     excel = None
-#     try:
-#         cerrar_instancias_excel()
-#         pythoncom.CoInitialize()
-#         excel = win32com.client.Dispatch("Excel.Application")
-#         excel.Visible = True
-#         excel.ScreenUpdating = True
-#         excel.DisplayAlerts = False
-#         for archivo in os.listdir(RUTA_ENTRADA):            
-#             maestra = os.path.join(RUTA_ENTRADA, archivo)
-
-#             if not os.path.isfile(maestra):
-#                 continue
-#             nombre, extencion = os.path.splitext(archivo)
-#             if archivo.startswith('~$') or extencion != '.xlsx':
-#                 continue
-            
-#             workbook = excel.Workbooks.Open(maestra)
-#             for nombre, df in dfs.items():
-#                 nombre_df = nombre
-#                 df_maestra = df
-#                 # return nombre_df, df_maestra
-            
-#                 print(f"\n===== {nombre} =====")
-#                 print(tabulate(df.head(), headers="keys", tablefmt="psql"))
-#             hoja = workbook.Worksheets("ARCHIVO EXCEL")
-
-
-#             while excel.CalculationState != 0:
-#                 time.sleep(1)
-#             workbook.Save()
-#             workbook.Close(False)
-#     except Exception as e:
-#         print(f'❌ ERROR ----- {e}')
-#     finally:
-#         if excel is not None:
-#             excel.Quit()
-#         pythoncom.CoUninitialize()
-
 
 MESES = {
     1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
@@ -307,10 +242,76 @@ def actualizar_maestras_excels():
         if excel is not None:
             excel.Quit()
         pythoncom.CoUninitialize()
+    
+DESTINATARIOS = [
+    "aprendizprogramacion2@gco.com.co"
+]
+
+ASUNTO_CORREO = "Maestras actualizadas - Junio 2026"
+
+CUERPO_CORREO = """
+Buen día,
+
+Se adjuntan las maestras actualizadas correspondientes al mes de Junio.
+
+Saludos,
+Miguel Cardona
+"""
+
+def enviar_maestras_correo():
+    outlook = None
+    try:
+        print("\n📧 Iniciando envío de correo con maestras adjuntas...")
+
+        # Buscar todos los archivos en RUTA_SALIDA que sean maestras
+        adjuntos = []
+        for archivo in os.listdir(RUTA_SALIDA):
+            ruta_archivo = os.path.join(RUTA_SALIDA, archivo)
+            # Solo archivos Excel, ignorar carpetas y temporales
+            if os.path.isfile(ruta_archivo) and not archivo.startswith('~$'):
+                if archivo.endswith('.xlsx') or archivo.endswith('.xlsb'):
+                    adjuntos.append(ruta_archivo)
+
+        if not adjuntos:
+            print("⚠️  No se encontraron archivos para adjuntar en RUTA_SALIDA.")
+            return
+
+        print(f"   → {len(adjuntos)} archivo(s) encontrado(s) para adjuntar")
+
+        # Iniciar Outlook
+        pythoncom.CoInitialize()
+        outlook = win32com.client.Dispatch("Outlook.Application")
+        correo  = outlook.CreateItem(0)  # 0 = MailItem
+
+        # Destinatarios
+        for destinatario in DESTINATARIOS:
+            correo.Recipients.Add(destinatario)
+
+        # Asunto y cuerpo
+        correo.Subject = ASUNTO_CORREO
+        correo.Body    = CUERPO_CORREO
+
+        # Adjuntar archivos
+        for ruta_adjunto in adjuntos:
+            correo.Attachments.Add(ruta_adjunto)
+            print(f"   → Adjuntando: {os.path.basename(ruta_adjunto)}")
+
+        # Enviar
+        correo.Send()
+        print("✅ Correo enviado exitosamente!")
+        print(f"   → Destinatarios: {', '.join(DESTINATARIOS)}")
+
+    except Exception as e:
+        print(f"❌ ERROR en enviar_maestras_correo ----- {e}")
+    finally:
+        if outlook is not None:
+            outlook.Quit()
+        pythoncom.CoUninitialize()
 
 def main():
     actualizar_maestras_bd()
     actualizar_maestras_excels()
+    enviar_maestras_correo()
 
 if __name__ == '__main__':
     main()
